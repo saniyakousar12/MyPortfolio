@@ -5,13 +5,20 @@ const Footer = () => {
   const currentYear = new Date().getFullYear()
 
   const socialLinks = [
-    { icon: FaGithub, href: "https://github.com/saniya-kousar", label: "GitHub" },
+    { icon: FaGithub, href: "https://github.com/saniyakousar12", label: "GitHub" },
     { icon: FaLinkedin, href: "https://linkedin.com/in/saniya-kousar-48b73327a", label: "LinkedIn" },
     { icon: FaEnvelope, href: "mailto:saniyakousar013@gmail.com", label: "Email" },
   ]
 
+  const scrollToSection = (id) => {
+    const element = document.querySelector(id)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+
   return (
-    <footer className="bg-gray-900 dark:bg-gray-950 text-white py-12 border-t border-gray-800">
+    <footer className="relative z-10 bg-gray-900 dark:bg-gray-950 text-white py-12 border-t border-gray-800 w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Main Footer Content */}
         <div className="grid md:grid-cols-3 gap-8 mb-8">
@@ -20,6 +27,7 @@ const Footer = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
+            viewport={{ once: true }}
             className="text-center md:text-left"
           >
             <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent mb-2">
@@ -33,18 +41,19 @@ const Footer = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
+            viewport={{ once: true }}
             className="text-center"
           >
             <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
             <div className="space-y-2">
-              {['#home', '#about', '#projects', '#contact'].map((link) => (
-                <a
+              {['#home', '#about', '#skills', '#projects', '#contact'].map((link) => (
+                <button
                   key={link}
-                  href={link}
-                  className="block text-gray-400 hover:text-blue-400 transition-colors duration-300"
+                  onClick={() => scrollToSection(link)}
+                  className="block w-full text-center md:text-center text-gray-400 hover:text-blue-400 transition-colors duration-300 cursor-pointer"
                 >
                   {link.substring(1).charAt(0).toUpperCase() + link.substring(2)}
-                </a>
+                </button>
               ))}
             </div>
           </motion.div>
@@ -54,6 +63,7 @@ const Footer = () => {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
+            viewport={{ once: true }}
             className="text-center md:text-right"
           >
             <h4 className="text-lg font-semibold mb-4">Connect</h4>
@@ -81,6 +91,7 @@ const Footer = () => {
           initial={{ scaleX: 0 }}
           whileInView={{ scaleX: 1 }}
           transition={{ duration: 0.6 }}
+          viewport={{ once: true }}
           className="h-px bg-gradient-to-r from-transparent via-gray-700 to-transparent mb-8 origin-left"
         />
 
@@ -89,15 +100,13 @@ const Footer = () => {
           initial={{ opacity: 0 }}
           whileInView={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.3 }}
+          viewport={{ once: true }}
           className="text-center space-y-2"
         >
           <p className="text-gray-400">
             © {currentYear} Saniya Kousar. All rights reserved.
           </p>
-          <p className="text-sm text-gray-500">
-            Computer Science Engineering Student | Full Stack Developer
-          </p>
-    
+        
         </motion.div>
       </div>
     </footer>
