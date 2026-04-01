@@ -13,73 +13,610 @@ import {
   SiMysql, SiGit, SiHtml5, SiSpring, SiCplusplus, SiC, SiHibernate, SiPostman
 } from 'react-icons/si'
 
-/* ─── Animated background ────────────────────────────────────────── */
-const Background = () => {
+/* ─── Particle Background (New) ─────────────────────────────────── */
+const ParticleBackground = () => {
   const canvasRef = useRef(null)
-  const mouse = useRef({ x: -999, y: -999 })
-  const raf = useRef(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    let W, H
-    const resize = () => { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight }
-    resize()
-    window.addEventListener('resize', resize)
-    const onMouse = e => { mouse.current = { x: e.clientX, y: e.clientY } }
-    const onTouch = e => { mouse.current = { x: e.touches[0].clientX, y: e.touches[0].clientY } }
-    window.addEventListener('mousemove', onMouse)
-    window.addEventListener('touchmove', onTouch, { passive: true })
-    const orbs = [
-      { x: 0.15, y: 0.2,  r: 320, c: '0,212,255',  speed: 0.0003 },
-      { x: 0.85, y: 0.15, r: 260, c: '6,182,212',   speed: 0.0004 },
-      { x: 0.5,  y: 0.6,  r: 200, c: '99,102,241',  speed: 0.0005 },
-      { x: 0.2,  y: 0.8,  r: 180, c: '0,180,220',   speed: 0.0006 },
-      { x: 0.9,  y: 0.75, r: 240, c: '14,165,233',  speed: 0.00035 },
+    let raf, W, H
+    const particles = []
+    const ripples = []
+    const trails = []
+    let lastTrail = 0
+    let mouse = { x: -999, y: -999 }
+
+    const ORBS = [
+      { x: 0.2, y: 0.3, r: 220, hue: 195, phase: 0 },
+      { x: 0.75, y: 0.6, r: 260, hue: 210, phase: 1.2 },
+      { x: 0.5, y: 0.9, r: 180, hue: 180, phase: 2.4 },
     ]
-    let t = 0
-    const draw = () => {
-      t++
-      ctx.clearRect(0, 0, W, H)
-      ctx.fillStyle = '#020b18'
-      ctx.fillRect(0, 0, W, H)
-      orbs.forEach((o, i) => {
-        const ox = (o.x + Math.sin(t * o.speed + i) * 0.08) * W
-        const oy = (o.y + Math.cos(t * o.speed * 1.3 + i) * 0.06) * H
-        const g = ctx.createRadialGradient(ox, oy, 0, ox, oy, o.r)
-        g.addColorStop(0, `rgba(${o.c},0.18)`)
-        g.addColorStop(0.5, `rgba(${o.c},0.06)`)
-        g.addColorStop(1, `rgba(${o.c},0)`)
-        ctx.fillStyle = g
-        ctx.beginPath(); ctx.arc(ox, oy, o.r, 0, Math.PI * 2); ctx.fill()
-      })
-      const mx = mouse.current.x, my = mouse.current.y
-      const mg = ctx.createRadialGradient(mx, my, 0, mx, my, 200)
-      mg.addColorStop(0, 'rgba(0,212,255,0.07)')
-      mg.addColorStop(1, 'rgba(0,212,255,0)')
-      ctx.fillStyle = mg
-      ctx.beginPath(); ctx.arc(mx, my, 200, 0, Math.PI * 2); ctx.fill()
-      ctx.strokeStyle = 'rgba(0,212,255,0.04)'; ctx.lineWidth = 1
-      const gs = 60
-      for (let x = 0; x < W; x += gs) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke() }
-      for (let y = 0; y < H; y += gs) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke() }
-      const sl = (t * 0.5) % H
-      const slg = ctx.createLinearGradient(0, sl - 40, 0, sl + 40)
-      slg.addColorStop(0, 'rgba(0,212,255,0)')
-      slg.addColorStop(0.5, 'rgba(0,212,255,0.025)')
-      slg.addColorStop(1, 'rgba(0,212,255,0)')
-      ctx.fillStyle = slg; ctx.fillRect(0, sl - 40, W, 80)
-      raf.current = requestAnimationFrame(draw)
+
+    const resize = () => {
+      W = canvas.width = window.innerWidth
+      H = canvas.height = window.innerHeight
+      initParticles()
     }
-    draw()
+
+    const initParticles = () => {
+      particles.length = 0
+      const count = Math.min(120, Math.floor(W * H / 8000))
+      for (let i = 0; i < count; i++) {
+        particles.push({
+          x: Math.random() * W, y: Math.random() * H,
+          vx: (Math.random() - 0.5) * 0.35,
+          vy: (Math.random() - 0.5) * 0.35,
+          r: Math.random() * 1.8 + 0.6,
+          alpha: Math.random() * 0.4 + 0.15,
+          hue: 180 + Math.random() * 40,
+        })
+      }
+    }
+
+    const drawGrid = () => {
+      const step = 60
+      ctx.strokeStyle = 'rgba(0,212,255,0.04)'
+      ctx.lineWidth = 0.5
+      for (let x = 0; x < W; x += step) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke()
+      }
+      for (let y = 0; y < H; y += step) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke()
+      }
+    }
+
+    const drawOrbs = (t) => {
+      for (const o of ORBS) {
+        const px = o.x * W + Math.sin(t * 0.0004 + o.phase) * 50
+        const py = o.y * H + Math.cos(t * 0.0003 + o.phase * 1.3) * 35
+        const g = ctx.createRadialGradient(px, py, 0, px, py, o.r)
+        g.addColorStop(0, `hsla(${o.hue},90%,60%,0.09)`)
+        g.addColorStop(0.5, `hsla(${o.hue},80%,50%,0.04)`)
+        g.addColorStop(1, `hsla(${o.hue},70%,40%,0)`)
+        ctx.fillStyle = g
+        ctx.beginPath(); ctx.arc(px, py, o.r, 0, Math.PI * 2); ctx.fill()
+      }
+    }
+
+    const drawParticles = () => {
+      for (const p of particles) {
+        p.x += p.vx; p.y += p.vy
+        if (p.x < 0 || p.x > W) p.vx *= -1
+        if (p.y < 0 || p.y > H) p.vy *= -1
+        p.x = Math.max(0, Math.min(W, p.x))
+        p.y = Math.max(0, Math.min(H, p.y))
+
+        // repel from cursor
+        const dx = p.x - mouse.x, dy = p.y - mouse.y
+        const dist = Math.sqrt(dx * dx + dy * dy)
+        if (dist < 100 && dist > 0) {
+          const f = (100 - dist) / 100 * 0.8
+          p.x += (dx / dist) * f; p.y += (dy / dist) * f
+        }
+
+        ctx.beginPath()
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2)
+        ctx.fillStyle = `hsla(${p.hue},80%,70%,${p.alpha})`
+        ctx.fill()
+      }
+    }
+
+    const drawConnections = () => {
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x
+          const dy = particles[i].y - particles[j].y
+          const d = Math.sqrt(dx * dx + dy * dy)
+          if (d < 90) {
+            ctx.strokeStyle = `rgba(0,212,255,${(1 - d / 90) * 0.12})`
+            ctx.lineWidth = 0.5
+            ctx.beginPath()
+            ctx.moveTo(particles[i].x, particles[i].y)
+            ctx.lineTo(particles[j].x, particles[j].y)
+            ctx.stroke()
+          }
+        }
+        const dx = particles[i].x - mouse.x
+        const dy = particles[i].y - mouse.y
+        const d = Math.sqrt(dx * dx + dy * dy)
+        if (d < 140) {
+          ctx.strokeStyle = `rgba(0,212,255,${(1 - d / 140) * 0.35})`
+          ctx.lineWidth = 1
+          ctx.beginPath()
+          ctx.moveTo(particles[i].x, particles[i].y)
+          ctx.lineTo(mouse.x, mouse.y)
+          ctx.stroke()
+        }
+      }
+    }
+
+    const drawTrails = () => {
+      for (let i = trails.length - 1; i >= 0; i--) {
+        const tr = trails[i]
+        tr.life -= 0.025
+        if (tr.life <= 0) { trails.splice(i, 1); continue }
+        ctx.beginPath()
+        ctx.arc(tr.x, tr.y, tr.r * tr.life, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(0,212,255,${tr.life * 0.18})`
+        ctx.fill()
+      }
+    }
+
+    const drawRipples = () => {
+      for (let i = ripples.length - 1; i >= 0; i--) {
+        const rp = ripples[i]
+        rp.r += 2.5; rp.alpha -= 0.018
+        if (rp.alpha <= 0) { ripples.splice(i, 1); continue }
+        ctx.beginPath(); ctx.arc(rp.x, rp.y, rp.r, 0, Math.PI * 2)
+        ctx.strokeStyle = `rgba(0,212,255,${rp.alpha})`
+        ctx.lineWidth = 1; ctx.stroke()
+      }
+    }
+
+    const drawMouseGlow = () => {
+      if (mouse.x < 0) return
+      const g = ctx.createRadialGradient(mouse.x, mouse.y, 0, mouse.x, mouse.y, 90)
+      g.addColorStop(0, 'rgba(0,212,255,0.10)')
+      g.addColorStop(1, 'rgba(0,212,255,0)')
+      ctx.fillStyle = g
+      ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 90, 0, Math.PI * 2); ctx.fill()
+
+      ctx.beginPath(); ctx.arc(mouse.x, mouse.y, 3, 0, Math.PI * 2)
+      ctx.fillStyle = 'rgba(0,212,255,0.85)'; ctx.fill()
+
+      ctx.strokeStyle = 'rgba(0,212,255,0.3)'
+      ctx.lineWidth = 0.7; ctx.setLineDash([4, 4])
+      ctx.beginPath(); ctx.moveTo(mouse.x - 20, mouse.y); ctx.lineTo(mouse.x + 20, mouse.y); ctx.stroke()
+      ctx.beginPath(); ctx.moveTo(mouse.x, mouse.y - 20); ctx.lineTo(mouse.x, mouse.y + 20); ctx.stroke()
+      ctx.setLineDash([])
+    }
+
+    const frame = (t) => {
+      ctx.clearRect(0, 0, W, H)
+      if (t - lastTrail > 30 && mouse.x > 0) {
+        trails.push({ x: mouse.x, y: mouse.y, r: 6, life: 1 })
+        lastTrail = t
+      }
+      drawGrid(); drawOrbs(t); drawTrails()
+      drawParticles(); drawConnections(); drawRipples(); drawMouseGlow()
+      raf = requestAnimationFrame(frame)
+    }
+
+    const onMove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY }
+    const onLeave = () => { mouse.x = -999; mouse.y = -999 }
+    const onClick = (e) => {
+      ripples.push({ x: e.clientX, y: e.clientY, r: 4, alpha: 0.7 })
+      ripples.push({ x: e.clientX, y: e.clientY, r: 4, alpha: 0.4 })
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseleave', onLeave)
+    window.addEventListener('click', onClick)
+    window.addEventListener('resize', resize)
+    resize()
+    requestAnimationFrame(frame)
+
     return () => {
-      cancelAnimationFrame(raf.current)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseleave', onLeave)
+      window.removeEventListener('click', onClick)
       window.removeEventListener('resize', resize)
-      window.removeEventListener('mousemove', onMouse)
-      window.removeEventListener('touchmove', onTouch)
+      cancelAnimationFrame(raf)
     }
   }, [])
-  return <canvas ref={canvasRef} style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 0 }} />
+
+  return (
+    <canvas ref={canvasRef} style={{
+      position: 'fixed', top: 0, left: 0,
+      width: '100%', height: '100%',
+      pointerEvents: 'none', zIndex: 0,
+      background: '#020b18',
+    }} />
+  )
+}
+
+/* ─── Interactive Terminal (New) ────────────────────────────────── */
+const InteractiveTerminal = () => {
+  const [input, setInput] = useState('')
+  const [history, setHistory] = useState([])
+  const [commandIndex, setCommandIndex] = useState(-1)
+  const [commandHistory, setCommandHistory] = useState([])
+  const terminalRef = useRef(null)
+  const inputRef = useRef(null)
+
+  const asciiArt = `
+╔═══════════════════════════════════════════════════════════╗
+║                                                           ║
+║    ███████╗ █████╗ ███╗   ██╗██╗██╗   ██╗ █████╗          ║
+║    ██╔════╝██╔══██╗████╗  ██║██║╚██╗ ██╔╝██╔══██╗         ║
+║    ███████╗███████║██╔██╗ ██║██║ ╚████╔╝ ███████║         ║
+║    ╚════██║██╔══██║██║╚██╗██║██║  ╚██╔╝  ██╔══██║         ║
+║    ███████║██║  ██║██║ ╚████║██║   ██║   ██║  ██║         ║
+║    ╚══════╝╚═╝  ╚═╝╚═╝  ╚═══╝╚═╝   ╚═╝   ╚═╝  ╚═╝         ║
+║                                                           ║
+║           Welcome to Saniya's Interactive Terminal        ║
+║           Type 'help' to see available commands           ║
+╚═══════════════════════════════════════════════════════════╝
+  `
+
+  const commands = {
+    help: () => ({
+      output: `
+Available commands:
+  about      - Learn about Saniya
+  skills     - View technical skills
+  projects   - List featured projects
+  experience - Work experience & education
+  contact    - Get contact information
+  clear      - Clear terminal screen
+  social     - Social media links
+  github     - Open GitHub profile
+  linkedin   - Open LinkedIn profile
+  email      - Show email address
+  date       - Show current date & time
+  whoami     - Display user info
+  `
+    }),
+    
+    about: () => ({
+      output: `
+📝 ABOUT SANIYA KOUSAR
+─────────────────────────────────────────────
+🎓 Computer Science Engineering Student
+📍 Telangana, India
+💻 Full Stack Developer | AI Enthusiast
+🏆 9.96 CGA (Diploma) | 9.63 CGA (B.E.)
+
+Passionate about building scalable applications
+that solve real-world problems. Experienced in
+Java, Spring Boot, React, and AI technologies.
+
+"Code is poetry, and I write sonnets."
+      `
+    }),
+    
+    skills: () => ({
+      output: `
+🛠️ TECHNICAL SKILLS
+─────────────────────────────────────────────
+💻 Languages:
+   • Java, Python, JavaScript, C, C++
+
+⚛️ Frameworks & Libraries:
+   • React, Spring Boot, Spring AI, Hibernate
+   • Tailwind CSS, Bootstrap
+
+🗄️ Databases & Tools:
+   • MySQL, Git, Postman, VS Code
+
+📊 Key Strengths:
+   • Data Structures & Algorithms
+   • REST API Development
+   • Problem Solving
+      `
+    }),
+    
+    projects: () => ({
+      output: `
+🚀 FEATURED PROJECTS
+─────────────────────────────────────────────
+📚 BookSwap [01]
+   • AI-powered book exchange platform
+   • Real-time WebSocket notifications
+   • Secure payments & gamification
+   • Tech: React, Spring Boot, Spring AI
+
+🔍 Plagiarism Detector [02]
+   • Text & image plagiarism detection
+   • Hologram matching for images
+   • Similarity percentage calculation
+   • Tech: Python, Django, Image Processing
+
+👉 Type 'github' to view projects on GitHub
+      `
+    }),
+    
+    experience: () => ({
+      output: `
+💼 WORK EXPERIENCE & EDUCATION
+─────────────────────────────────────────────
+💻 Java Developer Intern
+   Infosys Springboard | Nov 2025 - Feb 2026
+   • Core Java, OOP, Collections
+   • Spring Boot REST APIs
+   • Agile methodology
+
+🎓 Education
+   • B.E. Computer Science (9.63 CGA)
+     UCET, Osmania University | 2024-Present
+   • Diploma in CSE (9.96 CGA)
+     Govt Polytechnic Warangal | 2021-2024
+
+🏅 Leadership
+   • Organizer - IEEE Women in Engineering
+     Led events reaching 300+ students
+      `
+    }),
+    
+    contact: () => ({
+      output: `
+📫 CONTACT INFORMATION
+─────────────────────────────────────────────
+📧 Email: saniyakousar013@gmail.com
+📱 Phone: +91 9059447996
+💼 LinkedIn: /in/saniya-kousar-48b73327a
+🐙 GitHub: /saniyakousar12
+
+Type 'email' to send a message
+      `
+    }),
+    
+    social: () => ({
+      output: `
+🌐 SOCIAL LINKS
+─────────────────────────────────────────────
+• GitHub:    https://github.com/saniyakousar12
+• LinkedIn:  https://linkedin.com/in/saniya-kousar-48b73327a
+• Email:     saniyakousar013@gmail.com
+
+Click the links above or type 'github'/'linkedin'
+      `
+    }),
+    
+    github: () => ({
+      output: `
+🚀 Opening GitHub profile...
+      `,
+      action: () => {
+        window.open('https://github.com/saniyakousar12', '_blank')
+      }
+    }),
+    
+    linkedin: () => ({
+      output: `
+💼 Opening LinkedIn profile...
+      `,
+      action: () => {
+        window.open('https://linkedin.com/in/saniya-kousar-48b73327a', '_blank')
+      }
+    }),
+    
+    email: () => ({
+      output: `
+📧 Opening mail client...
+      `,
+      action: () => {
+        window.location.href = 'mailto:saniyakousar013@gmail.com'
+      }
+    }),
+    
+    date: () => ({
+      output: `
+📅 Current Date & Time:
+   ${new Date().toLocaleString()}
+      `
+    }),
+    
+    whoami: () => ({
+      output: `
+👩‍💻 USER INFORMATION
+─────────────────────────────────────────────
+Username: saniya_kousar
+Role: Full Stack Developer
+Location: Telangana, India
+Status: Open to opportunities ✨
+      `
+    }),
+    
+    clear: () => ({
+      clear: true,
+      output: ''
+    })
+  }
+
+  const executeCommand = (cmd) => {
+    const trimmedCmd = cmd.trim().toLowerCase()
+    
+    if (trimmedCmd === '') {
+      return { output: '' }
+    }
+    
+    const command = commands[trimmedCmd]
+    
+    if (command) {
+      const result = command()
+      if (result.action) result.action()
+      return result
+    } else {
+      return {
+        output: `Command not found: ${cmd}\nType 'help' to see available commands.`
+      }
+    }
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!input.trim()) return
+    
+    setCommandHistory(prev => [...prev, input])
+    setCommandIndex(-1)
+    
+    const result = executeCommand(input)
+    
+    setHistory(prev => [
+      ...prev,
+      { type: 'input', content: `> ${input}` },
+      { type: 'output', content: result.output }
+    ])
+    
+    setInput('')
+    
+    if (input.trim().toLowerCase() === 'clear') {
+      setHistory([])
+    }
+    
+    setTimeout(() => {
+      if (terminalRef.current) {
+        terminalRef.current.scrollTop = terminalRef.current.scrollHeight
+      }
+    }, 100)
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      if (commandHistory.length > 0 && commandIndex < commandHistory.length - 1) {
+        const newIndex = commandIndex + 1
+        setCommandIndex(newIndex)
+        setInput(commandHistory[commandHistory.length - 1 - newIndex])
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      if (commandIndex > 0) {
+        const newIndex = commandIndex - 1
+        setCommandIndex(newIndex)
+        setInput(commandHistory[commandHistory.length - 1 - newIndex])
+      } else if (commandIndex === 0) {
+        setCommandIndex(-1)
+        setInput('')
+      }
+    }
+  }
+
+  useEffect(() => {
+    const handleClick = () => {
+      inputRef.current?.focus()
+    }
+    const terminal = terminalRef.current
+    if (terminal) {
+      terminal.addEventListener('click', handleClick)
+      return () => terminal.removeEventListener('click', handleClick)
+    }
+  }, [])
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6 }}
+      viewport={{ once: true }}
+      style={{
+        margin: '40px auto',
+        maxWidth: 900,
+        borderRadius: 16,
+        overflow: 'hidden',
+        position: 'relative',
+        zIndex: 10,
+      }}
+    >
+      {/* Terminal Header */}
+      <div style={{
+        background: 'rgba(0,0,0,0.5)',
+        padding: '12px 20px',
+        borderBottom: '1px solid rgba(0,212,255,0.2)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+      }}>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f56' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#ffbd2e' }} />
+          <div style={{ width: 12, height: 12, borderRadius: '50%', background: '#27c93f' }} />
+        </div>
+        <span style={{ color: '#00d4ff', fontSize: 12, fontFamily: 'monospace' }}>
+          saniya@portfolio:~/
+        </span>
+      </div>
+
+      {/* Terminal Content */}
+      <div
+        ref={terminalRef}
+        style={{
+          height: 500,
+          overflowY: 'auto',
+          padding: '20px',
+          background: 'rgba(2,11,24,0.9)',
+          fontFamily: 'monospace',
+          fontSize: 14,
+          color: '#00ff9d',
+        }}
+      >
+        {/* ASCII Art */}
+        <pre style={{
+          color: '#00d4ff',
+          fontSize: 10,
+          marginBottom: 20,
+          whiteSpace: 'pre-wrap',
+          wordWrap: 'break-word',
+        }}>
+          {asciiArt}
+        </pre>
+
+        {/* Command History */}
+        <AnimatePresence>
+          {history.map((item, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ marginBottom: 8 }}
+            >
+              {item.type === 'input' ? (
+                <div style={{ color: '#00d4ff' }}>{item.content}</div>
+              ) : (
+                <pre style={{
+                  color: '#9ca3af',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                  fontFamily: 'monospace',
+                  margin: '4px 0 12px 0',
+                  lineHeight: 1.6,
+                }}>
+                  {item.content}
+                </pre>
+              )}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+
+        {/* Input Line */}
+        <form onSubmit={handleSubmit} style={{ display: 'flex', alignItems: 'center', marginTop: 8 }}>
+          <span style={{ color: '#00d4ff', marginRight: 8 }}>$</span>
+          <input
+            ref={inputRef}
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#fff',
+              fontFamily: 'monospace',
+              fontSize: 14,
+              flex: 1,
+              outline: 'none',
+            }}
+            autoFocus
+          />
+        </form>
+      </div>
+
+      {/* Terminal Footer */}
+      <div style={{
+        background: 'rgba(0,0,0,0.3)',
+        padding: '8px 20px',
+        borderTop: '1px solid rgba(0,212,255,0.1)',
+        fontSize: 11,
+        color: '#4b5563',
+        fontFamily: 'monospace',
+      }}>
+        ⚡ Type 'help' to get started | Use ↑/↓ arrows for command history
+      </div>
+    </motion.div>
+  )
 }
 
 /* ─── Glowing cursor (desktop only) ─────────────────────────────── */
@@ -168,7 +705,6 @@ const useWindowWidth = () => {
   return width
 }
 
-/* ─── ProjectCard (No Add Image Button) ──────────────────────────── */
 /* ─── ProjectCard (With Hover Images) ──────────────────────────── */
 const ProjectCard = ({ p, i }) => {
   const [isHovered, setIsHovered] = useState(false)
@@ -486,12 +1022,12 @@ export default function Home() {
           100% { transform: rotate(360deg); }
         }
       `}</style>
+<CursorGlow />
+<ParticleBackground />
 
-      <CursorGlow />
-      <Background />
-
-      <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#020b18', minHeight: '100vh', position: 'relative' }}>
-
+     <div style={{ fontFamily: "'DM Sans', sans-serif", background: '#020b18', minHeight: '100vh', position: 'relative', zIndex: 1 }}>
+        {/* All your content goes here */}
+      
         {/* ══ NAV ════════════════════════════════════════════════════ */}
         <nav style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 100, padding: isMobile ? '14px 20px' : '18px 40px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(2,11,24,0.85)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(0,212,255,0.06)' }}>
           <span style={{ fontFamily: "'Syne', sans-serif", fontWeight: 900, fontSize: 20, color: '#fff' }}>SK<span style={{ color: '#00d4ff' }}>.</span></span>
@@ -720,6 +1256,28 @@ export default function Home() {
           </div>
         </section>
 
+       {/* ══ INTERACTIVE TERMINAL (NEW) ═════════════════════════════ */}
+<div style={{ position: 'relative', zIndex: 10, marginTop: isMobile ? 20 : 40 }}>
+  <motion.div
+    initial={{ opacity: 0, y: 20 }}
+    whileInView={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.6 }}
+    viewport={{ once: true }}
+    style={{ textAlign: 'center', marginBottom: 24 }}
+  >
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, background: 'rgba(0,212,255,0.1)', padding: '8px 24px', borderRadius: 40, border: '1px solid rgba(0,212,255,0.3)', backdropFilter: 'blur(8px)' }}>
+      <span style={{ fontSize: 20 }}>💻</span>
+      <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: isMobile ? 20 : 24, fontWeight: 700, color: '#00d4ff', letterSpacing: '-0.02em', margin: 0 }}>
+        Saniya's Terminal
+      </h3>
+      <span style={{ fontSize: 20, opacity: 0.7 }}>⚡</span>
+    </div>
+    <p style={{ color: '#6b7280', fontSize: 13, marginTop: 12 }}>
+      Interactive command-line experience — try typing <code style={{ color: '#00d4ff', background: 'rgba(0,212,255,0.1)', padding: '2px 6px', borderRadius: 6 }}>help</code> to get started
+    </p>
+  </motion.div>
+  <InteractiveTerminal />
+</div>
         {/* ══ PROJECTS ═══════════════════════════════════════════════ */}
         <section id="projects" style={{ padding: isMobile ? '72px 20px' : '112px 24px', position: 'relative', zIndex: 10 }}>
           <div style={{ maxWidth: 1100, margin: '0 auto' }}>
